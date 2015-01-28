@@ -34,7 +34,7 @@ func listUsers(res http.ResponseWriter, req *http.Request) {
 	}
 	var resstring string
 	for _, user := range users {
-		resstring = resstring + user.Name + " "
+		resstring = resstring + user.Name + " " + user.Id + " " + user.Form
 	}
 	fmt.Fprintf(res, resstring)
 }
@@ -55,5 +55,5 @@ func main() {
 	}
 	http.HandleFunc("/hello", hello)
 	http.HandleFunc("/users", listUsers)
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":3000", nil)
 }
