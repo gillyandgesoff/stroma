@@ -6,6 +6,7 @@ import (
 	r "github.com/dancannon/gorethink"
 	"log"
 	"net/http"
+	"github.com/julienschmidt/httprouter"
 )
 // global session object for RethinkDB connection pool
 var session *r.Session
@@ -19,13 +20,41 @@ type User struct {
 	Form	string	`gorethink:"form"`
 }
 
+// struct representing the event in the db
+type StatusChange struct {
+	Id		string	`gorethink:"id,omitempty"`
+	Current	string	`gorethink:"currentstatus"`
+	Time	string	`gorethink:"lastupdated"`
+}
+
 // test route
-func hello(res http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(res, "Hello Chappo!")
+func hello(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
+	fmt.Fprintf(res, authUser("r", "2948"))
+}
+
+func checkUser(res http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	// check user is authenticated, returns id
+	id := authUser(ps.ByName("username"), ps.ByName("pin"))
+	if id == "failed" {
+		fmt.Fprintf(res, "authentication failed")
+	} else {
+		// finds the status of the authenticated user
+		rows, err := r.Table("status").Get(id).Run(session)
+		if err != nil {
+			// db error, not user's fault
+			log.Fatalln(err.Error() + ps.ByName("username"))
+			fmt.Fprintf(res, "failed, contact support")
+		} else {
+			// return current status
+			var status StatusChange
+			err = rows.One(&status)
+			fmt.Fprintf(res, status.Current)
+		}
+	}
 }
 
 //route that lists the users in the db
-func listUsers(res http.ResponseWriter, req *http.Request) {
+func listUsers(res http.ResponseWriter, req *http.Request, _ httprouter.Params) {
 	// db query, returns cursor
 	rows, err := r.Table("user").Run(session)
 	if err != nil {
@@ -45,6 +74,24 @@ func listUsers(res http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(res, resstring)
 }
 
+// authenticates user
+func authUser(username string, pin string) string {
+	rows, err := r.Table("user").Filter(r.Row.Field("username").Eq(username)).Run(session)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+	if rows.IsNil() {
+		return "failed"
+	}
+	var user User
+	err = rows.One(&user)
+	if user.Pin == pin {
+		return user.Id
+	} else {
+		return "failed"
+	}
+}
+
 func main() {
 	// parse commandline flags
 	// dbAddress := flag.String("dbaddr", "localhost:28015", "The address and port of the RethinkDB cluster in host:port format.")
@@ -61,7 +108,12 @@ func main() {
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
-	http.HandleFunc("/hello", hello)
-	http.HandleFunc("/users", listUsers)
-	http.ListenAndServe(":3000", nil)
+	router := httprouter.New()
+	router.GET("/hello", hello)
+	router.GET("/users", listUsers)
+	router.GET("/user/:username/:pin/status", checkUser)
+	//TODO: router.POST("/user/:username/:pin/status", setUser)
+	// need to know how to update documents, set time
+	// need to restructure status table to allow history
+	http.ListenAndServe(":3000", router)
 }
