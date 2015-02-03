@@ -47,15 +47,15 @@ func listUsers(res http.ResponseWriter, req *http.Request) {
 
 func main() {
 	// parse commandline flags
-	dbAddress := flag.String("dbaddr", "localhost:28015", "The address and port of the RethinkDB cluster in host:port format.")
-	dbName := flag.String("dbname", "stroma", "The name of the db in RethinkDB")
+	// dbAddress := flag.String("dbaddr", "localhost:28015", "The address and port of the RethinkDB cluster in host:port format.")
+	// dbName := flag.String("dbname", "stroma", "The name of the db in RethinkDB")
 	maxConn := flag.Int("maxconn", 1, "The maximum number of active connections in the RethinkDB connection pool.")
 	flag.Parse()
 	var err error
 	// connect to db and initialise session with options
 	session, err = r.Connect(r.ConnectOpts{
-		Address:   *dbAddress,
-		Database:  *dbName,
+		Address:   "db:28015",
+		Database:  "stroma",
 		MaxActive: *maxConn,
 	})
 	if err != nil {
